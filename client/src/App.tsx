@@ -4,6 +4,8 @@ import Header from './Header';
 import LeftSidebar from './LeftSidebar';
 import RightBar from './RightBar';
 import Timeline from './Timeline';
+import { gql } from '@apollo/client';
+import { useGetCurrentUserQuery } from './generated/graphql';
 
 const CURRENT_USER = {
   name: 'Stu Dent',
@@ -41,32 +43,74 @@ const TRENDS = [
   },
 ];
 
-const SUGGESTIONS = [
-  {
-    name: 'TypeScript Project',
-    handle: 'TypeScript',
-    avatarUrl: 'http://localhost:3000/static/ts-logo.png',
-    reason: 'Because you follow @MichaelLNorth',
-  },
-];
+export const GET_CURRENT_USER = gql`
+  query GetCurrentUser {
+    currentUser {
+      id
+      name
+      handle
+      avatarUrl
+      createdAt
+      stats {
+        tweetCount
+        followerCount
+        followingCount
+      }
+      favorites {
+        tweet {
+          id
+        }
+      }
+    }
+    suggestions {
+      name
+      handle
+      avatarUrl
+      reason
+    }
+    trends {
+      ... on TopicTrend {
+        tweetCount
+        topic
+        quote {
+          title
+          imageUrl
+          description
+        }
+      }
+      ... on HashtagTrend {
+        tweetCount
+        hashtag
+      }
+    }
+  }
+`;
 
 const App: React.FC = () => {
-  const { favorites: rawFavorites } = CURRENT_USER;
+  const { loading, error, data } = useGetCurrentUserQuery();
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error}</p>;
+  if (!data) return <p>No data.</p>;
+  const { currentUser, suggestions = [], trends = [] } = data;
+
+  const { favorites: rawFavorites } = currentUser;
   const favorites = (rawFavorites || [])
     .map((f) => f.tweet?.id)
     .filter(isDefined);
 
+  const filteredTrends = trends.filter(isDefined);
+
   return (
     <div>
-      <LeftSidebar currentUser={CURRENT_USER} />
-      <Header currentUser={CURRENT_USER} />
+      <LeftSidebar currentUser={currentUser} />
+      <Header currentUser={currentUser} />
 
       <div id="container" className="wrapper nav-closed">
         <Timeline
-          currentUserId={CURRENT_USER.id}
+          currentUserId={currentUser.id}
           currentUserFavorites={favorites}
         />
-        <RightBar trends={TRENDS} suggestions={SUGGESTIONS} />
+        <RightBar trends={filteredTrends} suggestions={suggestions} />
       </div>
     </div>
   );
